@@ -205,7 +205,7 @@ public class BestSmoothNormalTool : EditorWindow
                         GUILayout.Label("", this.inner_gitHubStyle, GUILayout.Height(32), GUILayout.Width(32));
                         GUILayout.BeginVertical();
                         GUILayout.Label("项目所在 GitHub", this.inner_textStyle);
-                        GUILayout.TextArea("https://github.com/zhoushilei0918/BeingBestSmoothNormalTool", GUILayout.ExpandWidth(true));
+                        GUILayout.TextArea("https://github.com/zhoushilei0918/BestSmoothNormalTool", GUILayout.ExpandWidth(true));
                         GUILayout.EndVertical();
                     }
                     GUILayout.EndHorizontal();
