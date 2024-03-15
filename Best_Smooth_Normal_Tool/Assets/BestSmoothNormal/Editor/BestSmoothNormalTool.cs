@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.Serialization.Formatters.Binary;
 using UnityEditor;
 using UnityEditor.AnimatedValues;
 using UnityEngine;
@@ -443,8 +444,7 @@ public class BestSmoothNormalTool : EditorWindow
     private Mesh ImportSmoothNormalData2Mesh(Mesh mesh, Vector3[] averageNormals)
     {
         // 复制 Mesh
-        Mesh meshCopy = new Mesh();
-        CopyMesh(meshCopy, mesh);
+        Mesh meshCopy = CopyMesh(mesh);
 
         int count = meshCopy.vertexCount;
         // 写入顶点色中
@@ -542,31 +542,17 @@ public class BestSmoothNormalTool : EditorWindow
 
     #region 复制 Mesh
 
-    private void CopyMesh(Mesh destMesh, Mesh srcMesh)
+    private Mesh CopyMesh(Mesh srcMesh)
     {
-        destMesh.Clear();
-        destMesh.vertices = srcMesh.vertices;
-        List<Vector4> uvs = new List<Vector4>();
-        srcMesh.GetUVs(0, uvs);
-        destMesh.SetUVs(0, uvs);
-        srcMesh.GetUVs(1, uvs);
-        destMesh.SetUVs(1, uvs);
-        srcMesh.GetUVs(2, uvs);
-        destMesh.SetUVs(2, uvs);
-        srcMesh.GetUVs(3, uvs);
-        destMesh.SetUVs(3, uvs);
-        destMesh.normals = srcMesh.normals;
-        destMesh.tangents = srcMesh.tangents;
-        destMesh.boneWeights = srcMesh.boneWeights;
-        destMesh.colors = srcMesh.colors;
-        destMesh.colors32 = srcMesh.colors32;
-        destMesh.bindposes = srcMesh.bindposes;
-        destMesh.subMeshCount = srcMesh.subMeshCount;
-        for (int i = 0; i < srcMesh.subMeshCount; i++)
+        object retObj = null;
+        using (MemoryStream stream = new MemoryStream())
         {
-            destMesh.SetIndices(srcMesh.GetIndices(i), srcMesh.GetTopology(i), i);
+            BinaryFormatter binaryFormatter = new BinaryFormatter();
+            binaryFormatter.Serialize(stream, srcMesh);
+            stream.Seek(0, SeekOrigin.Begin);
+            retObj = binaryFormatter.Deserialize(stream);
         }
-        destMesh.name = srcMesh.name;
+        return (Mesh)retObj;
     }
 
     #endregion
