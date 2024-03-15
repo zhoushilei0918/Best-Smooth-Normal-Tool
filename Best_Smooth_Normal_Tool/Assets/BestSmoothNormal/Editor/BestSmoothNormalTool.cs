@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
+using Unity.Mathematics;
 using UnityEditor;
 using UnityEditor.AnimatedValues;
 using UnityEngine;
@@ -84,20 +85,20 @@ public class BestSmoothNormalTool : EditorWindow
             window.inner_windowStyle.alignment = TextAnchor.MiddleCenter;
             window.inner_windowStyle.margin = new RectOffset(5, 5, 5, 5);
         }
-        if (window.inner_textStyle == null)
+        if(window.inner_textStyle == null)
         {
             window.inner_textStyle = new GUIStyle();
             window.inner_textStyle.fontStyle = FontStyle.Bold;
             window.inner_textStyle.margin = new RectOffset(5, 5, 5, 5);
             window.inner_textStyle.normal.textColor = Color.white;
         }
-        if (window.inner_gitHubStyle == null)
+        if(window.inner_gitHubStyle == null)
         {
             window.inner_gitHubStyle = new GUIStyle();
             window.inner_gitHubStyle.margin = new RectOffset(5, 0, 10, 0);
             window.inner_gitHubStyle.normal.background = (Texture2D)Resources.Load("Textures/github");
         }
-        if (window.inner_qqStyle == null)
+        if(window.inner_qqStyle == null)
         {
             window.inner_qqStyle = new GUIStyle();
             window.inner_qqStyle.margin = new RectOffset(5, 0, 10, 0);
@@ -122,7 +123,7 @@ public class BestSmoothNormalTool : EditorWindow
 
         GUILayout.BeginHorizontal();
         {
-            GUILayout.Box("法线平滑小工具", this.inner_windowStyle, GUILayout.Height(50), GUILayout.ExpandWidth(true));
+            GUILayout.Box("法线平滑小工具", this.inner_windowStyle, GUILayout.Height(50), GUILayout.ExpandWidth(true));        
         }
         GUILayout.EndHorizontal();
 
@@ -153,7 +154,7 @@ public class BestSmoothNormalTool : EditorWindow
             }
 
             GUILayout.Space(5);
-            this.inner_curGameObject = EditorGUILayout.ObjectField("选择一个 Mesh 物体", this.inner_curGameObject, typeof(GameObject), true) as GameObject;
+            EditorGUILayout.ObjectField("选择一个 Mesh 物体", this.inner_curGameObject, typeof(GameObject), true);
             GUILayout.Space(5);
 
             EditorGUI.BeginDisabledGroup(this.inner_curGameObject == null);
@@ -286,8 +287,10 @@ public class BestSmoothNormalTool : EditorWindow
         {
             return (false, null);
         }
-        Vector3[] averageNormals = AverageNormal(mesh);
-        Mesh meshExport = ImportSmoothNormalData2Mesh(mesh, averageNormals);
+        Mesh copyMesh = new Mesh();
+        CopyMesh(copyMesh, mesh);
+        Vector3[] averageNormals = AverageNormal(copyMesh);
+        Mesh meshExport = ImportSmoothNormalData2Mesh(copyMesh, averageNormals);
         AssetDatabase.CreateAsset(meshExport, relativePath);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -366,7 +369,7 @@ public class BestSmoothNormalTool : EditorWindow
                         float AdotA = Vector3.Dot(lineA, lineA);
                         float BdotB = Vector3.Dot(lineB, lineB);
                         float AdotB = Vector3.Dot(lineA, lineB);
-                        curWeight = MathF.Sqrt(AdotA * BdotB - AdotB * AdotB);
+                        curWeight = math.sqrt(AdotA * BdotB - AdotB * AdotB);
                         //curWeight = Vector3.Magnitude(Vector3.Cross(lineA, lineB));
                     }
 
@@ -410,9 +413,10 @@ public class BestSmoothNormalTool : EditorWindow
                 Vector3 B = (Vector3.Cross(N, T) * T.w).normalized;
                 Matrix4x4 TBN = new Matrix4x4(T, B, N, Vector3.zero);
                 TBN = TBN.transpose;
-                smoothNormals[i] = TBN.MultiplyVector(smoothNormals[i]).normalized;
+                smoothNormals[i] = TBN.MultiplyVector(smoothNormals[i]).normalized;             
             }
 
+            //mesh.SetUVs(7, smoothNormals);
             return smoothNormals;
         }
         else
@@ -444,9 +448,7 @@ public class BestSmoothNormalTool : EditorWindow
     private Mesh ImportSmoothNormalData2Mesh(Mesh mesh, Vector3[] averageNormals)
     {
         // 复制 Mesh
-        Mesh meshCopy = CopyMesh(mesh);
-
-        int count = meshCopy.vertexCount;
+        int count = mesh.vertexCount;
         // 写入顶点色中
         if (this.inner_writeTarget == WriteTargetType.VertexColor)
         {
@@ -460,7 +462,7 @@ public class BestSmoothNormalTool : EditorWindow
                     this.inner_isMap01 ? cur.z * 0.5f + 0.5f : cur.z,
                     mesh.colors == null || mesh.colors.Length == 0 ? 0.0f : mesh.colors[i].a);
             }
-            meshCopy.colors = colors;
+            mesh.colors = colors;
         }
         else if (this.inner_writeTarget == WriteTargetType.Tanget)// 保存到切线中
         {
@@ -474,17 +476,16 @@ public class BestSmoothNormalTool : EditorWindow
                     this.inner_isMap01 ? cur.z * 0.5f + 0.5f : cur.z,
                     mesh.tangents == null || mesh.tangents.Length == 0 ? 0.0f : mesh.tangents[i].w);
             }
-            meshCopy.tangents = tangents;
+            mesh.tangents = tangents;
         }
         else
         {
             Vector3[] uvs = new Vector3[count];
             Vector2[] uvs_oct = new Vector2[count];
-            for (int i = 0; i < averageNormals.Length; i++)
+            for(int i =0; i< averageNormals.Length; i++)
             {
                 if (this.inner_isUseOctahedron)
                 {
-                    // 
                     Vector2 octNormal = GetOctahedronProjection(averageNormals[i]);
                     if (this.inner_isMap01)
                     {
@@ -504,25 +505,22 @@ public class BestSmoothNormalTool : EditorWindow
             if (this.inner_isUseOctahedron)
             {
                 // 保存到对应的 uv.xy
-                meshCopy.SetUVs((int)this.inner_writeTarget - 1, uvs_oct);
+                mesh.SetUVs((int)this.inner_writeTarget - 1, uvs_oct);
             }
             else
             {
                 /* Mesh 的 uv 是可以存 4 个分量，即 x、y、z 和 w */
                 // 保存到对应的 uv.xyz
-                meshCopy.SetUVs((int)this.inner_writeTarget - 1, uvs);
+                mesh.SetUVs((int)this.inner_writeTarget - 1, uvs);
             }
         }
-        return meshCopy;
+        return mesh;
     }
 
     #endregion
 
     #region 八面体投影算法
 
-    /// <summary>
-    /// 原理可以参考 https://zhuanlan.zhihu.com/p/408898601
-    /// </summary>
     private Vector2 GetOctahedronProjection(Vector3 smoothNormal)
     {
         float lenth = Mathf.Abs(smoothNormal.x) + Mathf.Abs(smoothNormal.y) + Mathf.Abs(smoothNormal.z);
@@ -542,17 +540,59 @@ public class BestSmoothNormalTool : EditorWindow
 
     #region 复制 Mesh
 
-    private Mesh CopyMesh(Mesh srcMesh)
+    private void CopyMesh(Mesh destMesh, Mesh srcMesh)
     {
-        object retObj = null;
-        using (MemoryStream stream = new MemoryStream())
+        destMesh.Clear();
+        destMesh.vertices = srcMesh.vertices;
+        List<Vector4> uvs = new List<Vector4>();
+        srcMesh.GetUVs(0, uvs);
+        destMesh.SetUVs(0, uvs);
+        srcMesh.GetUVs(1, uvs);
+        destMesh.SetUVs(1, uvs);
+        srcMesh.GetUVs(2, uvs);
+        destMesh.SetUVs(2, uvs);
+        srcMesh.GetUVs(3, uvs);
+        destMesh.SetUVs(3, uvs);
+        destMesh.normals = srcMesh.normals;
+        destMesh.tangents = srcMesh.tangents;
+        destMesh.boneWeights = srcMesh.boneWeights;
+        destMesh.colors = srcMesh.colors;
+        destMesh.colors32 = srcMesh.colors32;
+        destMesh.bindposes = srcMesh.bindposes;
+        destMesh.subMeshCount = srcMesh.subMeshCount;
+        for (int i = 0; i < srcMesh.subMeshCount; i++)
         {
-            BinaryFormatter binaryFormatter = new BinaryFormatter();
-            binaryFormatter.Serialize(stream, srcMesh);
-            stream.Seek(0, SeekOrigin.Begin);
-            retObj = binaryFormatter.Deserialize(stream);
+            destMesh.SetIndices(srcMesh.GetIndices(i), srcMesh.GetTopology(i), i);
         }
-        return (Mesh)retObj;
+        destMesh.name = srcMesh.name;
+        // 复制 BlendShape
+        int vertexCount = srcMesh.vertices.Length;
+        for (int i = 0; i < srcMesh.blendShapeCount; i++)
+        {
+            string shapeName = srcMesh.GetBlendShapeName(i);
+            int frameCount = srcMesh.GetBlendShapeFrameCount(i);
+
+            List<Vector3[]> vertexsList = new List<Vector3[]>();
+            List<Vector3[]> normalsList = new List<Vector3[]>();
+            List<Vector3[]> tangentsList = new List<Vector3[]>();
+            float[] weight = new float[frameCount];
+            for (int j = 0; j < frameCount; j++)
+            {
+                Vector3[] vertexs = new Vector3[vertexCount];
+                Vector3[] normals = new Vector3[vertexCount];
+                Vector3[] tangents = new Vector3[vertexCount];
+                srcMesh.GetBlendShapeFrameVertices(i, j, vertexs, normals, tangents);
+                vertexsList.Add(vertexs);
+                normalsList.Add(normals);
+                tangentsList.Add(tangents);
+                weight[j] = srcMesh.GetBlendShapeFrameWeight(i, j);
+            }
+
+            for (int j = 0; j < frameCount; j++)
+            {
+                destMesh.AddBlendShapeFrame(shapeName, weight[j], vertexsList[j], normalsList[j], tangentsList[j]);
+            }
+        }
     }
 
     #endregion
